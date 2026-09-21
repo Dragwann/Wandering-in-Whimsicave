@@ -2,21 +2,24 @@ import sys
 import math
 import pygame
 
-# ---------- CONFIG ----------
+# Config
 WIDTH, HEIGHT = 960, 540
 FPS = 60
 
+# Player Values
 PLAYER_RADIUS = 14
-PLAYER_SHOOT_COOLDOWN = 0.1   # Shoot Cooldown Value in seconds
+PLAYER_SHOOT_COOLDOWN = 0.1
 PLAYER_BULLET_SPEED = 520
 PLAYER_BULLET_RADIUS = 5
 
+# Boss Values
 BOSS_RADIUS = 55
 BOSS_MAX_HP = 40
 BOSS_BULLET_SPEED = 260
 BOSS_BULLET_RADIUS = 8
-BOSS_FIRE_COOLDOWN = 0.5     # Fire Cooldown Value in seconds
+BOSS_FIRE_COOLDOWN = 0.5
 
+# Colors Values
 WHITE = (240, 240, 240)
 BLACK = (10, 10, 10)
 RED = (220, 60, 60)
@@ -24,7 +27,7 @@ BLUE = (90, 160, 255)
 PURPLE = (170, 90, 220)
 GREEN = (90, 220, 120)
 
-
+# Player Init
 class Player:
     def __init__(self):
         self.x, self.y = 150, HEIGHT // 2
@@ -46,6 +49,7 @@ class Player:
         pygame.draw.circle(surf, GREEN, (int(self.x), int(self.y)), PLAYER_RADIUS)
 
 
+# Projectiles Init
 class Bullet:
     def __init__(self, x, y, vx, vy, radius, color):
         self.x, self.y = x, y
@@ -64,6 +68,7 @@ class Bullet:
         pygame.draw.circle(surf, self.color, (int(self.x), int(self.y)), self.radius)
 
 
+# Boss Init
 class Boss:
     def __init__(self):
         self.x, self.y = WIDTH - 160, HEIGHT // 2
@@ -71,9 +76,9 @@ class Boss:
         self.t = 0.0
         self.fire_timer = 0.0
 
+# Basic Movements
     def update(self, dt, bullets):
         self.t += dt
-        # Basic vertical movement 
         self.y = HEIGHT // 2 + math.sin(self.t * 1.3) * 160
 
         self.fire_timer -= dt
@@ -81,8 +86,8 @@ class Boss:
             self.fire_timer = BOSS_FIRE_COOLDOWN
             self.shoot(bullets)
 
+# Basic Shooting patern
     def shoot(self, bullets):
-        # Simple shoot patern of Boss
         nb = 5
         spread = 0.6  # radians
         for i in range(nb):
@@ -102,18 +107,17 @@ class Boss:
 def circle_hit(x1, y1, r1, x2, y2, r2):
     return math.hypot(x1 - x2, y1 - y2) < (r1 + r2)
 
-
+# Game Init
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("On SuuS Cuphead - Boss 1 (prototype)")
+    pygame.display.set_caption("Wandering in Whimsicave (prototype)")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("arial", 28)
     pygame.mouse.set_visible(False)
 
     def new_game():
         return Player(), Boss(), [], [], "playing"
-        # player, boss, player_bullets, boss_bullets, state
 
     player, boss, player_bullets, boss_bullets, state = new_game()
 
@@ -164,7 +168,7 @@ def main():
             if boss.hp <= 0:
                 state = "win"
 
-        # ---------- DRAWING ----------
+        # Drawing
         screen.fill((25, 20, 35))
         boss.draw(screen)
         for b in boss_bullets:
