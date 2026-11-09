@@ -139,7 +139,7 @@ def main():
         if state == "menu":
             draw_menu(screen, title_font, menu_font, selected)
         else:
-            screen.fill(BACKGROUND_COLOR)
+            boss.draw_background(screen)
             boss.draw(screen)
             for b in boss_bullets:
                 b.draw(screen)

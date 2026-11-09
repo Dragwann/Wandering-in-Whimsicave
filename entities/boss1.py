@@ -1,13 +1,22 @@
 import math
 import pygame
 
-from utilities.settings import WIDTH, HEIGHT, WHITE, RED, ORANGE, CRIMSON, PURPLE
-from projectiles.projectiles import Bullet, RainShell, WaveBullet, RAIN_SPLIT_Y, RAIN_SHELL_SPEED
+from utilities.settings import WIDTH, HEIGHT, WHITE, RED, ORANGE, CRIMSON, PURPLE, SHOW_HITBOXES
+from utilities.utils import load_image, white_silhouette, soften_background
+from projectiles.projectiles import (Bullet, RainShell, WaveBullet, RAIN_SPLIT_Y, RAIN_SHELL_SPEED,
+                                     pine_cone)
 from projectiles.hazards import Wall
-from utilities.ui import draw_health_bar
+
+# Boss 1 visuals (paths are relative to the assets folder)
+BOSS_IMAGE = "entities/Boss1_asset.png"
+BOSS_DRAW_HEIGHT = 250         # height of the boss on screen (px), width keeps the image ratio
+BACKGROUND_IMAGE = "backgrounds/Boss1_background.jpg"
+BACKGROUND_DIM = 0.45          # 0 = background untouched, 1 = fully black
+BACKGROUND_TINT = (15, 10, 30) # color of the veil laid over the background
+BACKGROUND_BLUR = 3            # 1 = no blur, 2-4 = softer details
 
 # Boss 1 Values
-BOSS_RADIUS = 55
+BOSS_RADIUS = 70               # hitbox (circle), visible with SHOW_HITBOXES
 BOSS_MAX_HP = 300
 BOSS_BASE_X = WIDTH - 130
 BOSS_MOVE_RANGE = 170          # vertical amplitude (px)
@@ -17,7 +26,7 @@ FIRST_ATTACK_DELAY = 1.0       # pause before the first attack of a phase
 
 # Attack: direct shot
 DIRECT_SPEED = 300
-DIRECT_RADIUS = 8
+DIRECT_RADIUS = 15
 
 # Boss 1 phases. Each phase = a color, a movement speed and a SEQUENCE of
 # (attack_name, delay_in_seconds_after_this_attack). The boss loops over it.
@@ -64,6 +73,12 @@ class Boss:
             "wave": self.attack_wave,
             "wall": self.attack_wall,
         }
+        # images (the pygame window must already exist when a Boss is created)
+        self.image = load_image(BOSS_IMAGE, height=BOSS_DRAW_HEIGHT)
+        self.flash_image = white_silhouette(self.image)   # white copy, used during phase transitions
+        self.background = soften_background(
+            load_image(BACKGROUND_IMAGE, size=(WIDTH, HEIGHT), alpha=False),
+            BACKGROUND_DIM, BACKGROUND_TINT, BACKGROUND_BLUR)
 
     # ---- HP / phases ----
     def get_phase(self):
@@ -122,7 +137,7 @@ class Boss:
         angle = math.atan2(player.y - self.y, player.x - self.x)
         bullets.append(Bullet(self.x, self.y,
                               math.cos(angle) * DIRECT_SPEED, math.sin(angle) * DIRECT_SPEED,
-                              DIRECT_RADIUS, PURPLE))
+                              DIRECT_RADIUS, PURPLE, pine_cone()))
 
     def attack_rain(self, bullets, player):
         # shell flies toward the top of the screen, above where the player is now
@@ -140,10 +155,14 @@ class Boss:
         self.wall_index += 1
 
     # ---- Draw ----
+    def draw_background(self, surf):
+        surf.blit(self.background, (0, 0))
+
     def draw(self, surf):
         color = PHASES[self.phase]["color"]
         # Flash white during the transition so the player understands something changed
-        if self.invulnerable() and int(self.transition_timer * 10) % 2 == 0:
-            color = WHITE
-        pygame.draw.circle(surf, color, (int(self.x), int(self.y)), self.radius)
-        draw_health_bar(surf, self.hp, self.max_hp, color)
+        flash = self.invulnerable() and int(self.transition_timer * 10) % 2 == 0
+        img = self.flash_image if flash else self.image
+        surf.blit(img, img.get_rect(center=(int(self.x), int(self.y))))
+        if SHOW_HITBOXES:
+            pygame.draw.circle(surf, WHITE, (int(self.x), int(self.y)), self.radius, 1)

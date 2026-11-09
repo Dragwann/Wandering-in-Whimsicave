@@ -2,10 +2,17 @@ import math
 import random
 import pygame
 
-from utilities.settings import WIDTH, HEIGHT, WHITE, WARNING, RED, YELLOW, TEAL
+from utilities.settings import WIDTH, HEIGHT, WHITE, WARNING, RED, YELLOW, TEAL, SHOW_HITBOXES
 from projectiles.projectiles import TrailBullet, TRAIL_INTERVAL
 from projectiles.hazards import Mine
-from utilities.ui import draw_health_bar
+from utilities.utils import load_image, white_silhouette, soften_background
+
+BOSS_IMAGE = "entities/Boss2_asset.png"
+BOSS_DRAW_HEIGHT = 330
+BACKGROUND_IMAGE = "backgrounds/Boss2_background.jpg"
+BACKGROUND_DIM = 0.45
+BACKGROUND_TINT = (15, 10, 30)
+BACKGROUND_BLUR = 3
 
 # Boss 2 Values
 BOSS2_RADIUS = 40
@@ -46,6 +53,15 @@ class Boss2:
         self.phase = 1
         self.transition_timer = 0.0
         self.reset_behavior()
+        # images (the pygame window must already exist when a Boss2 is created)
+        self.image = load_image(BOSS_IMAGE, height=BOSS_DRAW_HEIGHT)
+        self.flash_image = white_silhouette(self.image)   # white copy, used for blinks
+        self.image_flipped = pygame.transform.flip(self.image, True, False)
+        self.flash_flipped = pygame.transform.flip(self.flash_image, True, False)
+        self.facing_right = False
+        self.background = soften_background(
+            load_image(BACKGROUND_IMAGE, size=(WIDTH, HEIGHT), alpha=False),
+            BACKGROUND_DIM, BACKGROUND_TINT, BACKGROUND_BLUR)
 
     # ---- HP / phases ----
     def get_phase(self):
@@ -89,6 +105,8 @@ class Boss2:
         """Move at `speed` toward target. Returns True once the target is reached."""
         tx, ty = target
         dx, dy = tx - self.x, ty - self.y
+        if abs(dx) > 5:                      # seuil pour ne pas changer de sens sur un mouvement presque vertical
+            self.facing_right = dx > 0
         dist = math.hypot(dx, dy)
         step = speed * dt
         if dist <= step:
@@ -188,10 +206,12 @@ class Boss2:
                 self.state = "reposition"
 
     # ---- Draw ----
+    def draw_background(self, surf):
+        surf.blit(self.background, (0, 0))
+
     def draw(self, surf):
         color = BOSS2_PHASES[self.phase]["color"]
-        if self.invulnerable() and int(self.transition_timer * 10) % 2 == 0:
-            color = WHITE
+        flash = self.invulnerable() and int(self.transition_timer * 10) % 2 == 0
         if self.state == "telegraph":
             # the line shows exactly where the dash will go
             pygame.draw.line(surf, WARNING, (int(self.x), int(self.y)),
@@ -199,6 +219,14 @@ class Boss2:
             pygame.draw.circle(surf, WARNING, (int(self.dash_target[0]), int(self.dash_target[1])),
                                self.radius, 2)
             if int(self.state_timer * 20) % 2 == 0:
-                color = WHITE
-        pygame.draw.circle(surf, color, (int(self.x), int(self.y)), self.radius)
-        draw_health_bar(surf, self.hp, self.max_hp, color)
+                flash = True
+        if flash:
+            color = WHITE   # the health bar blinks too, like before
+
+        if self.facing_right:
+            img = self.flash_flipped if flash else self.image_flipped
+        else:
+            img = self.flash_image if flash else self.image
+        surf.blit(img, img.get_rect(center=(int(self.x), int(self.y))))
+        if SHOW_HITBOXES:
+            pygame.draw.circle(surf, WHITE, (int(self.x), int(self.y)), self.radius, 1)

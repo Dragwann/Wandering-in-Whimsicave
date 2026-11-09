@@ -1,6 +1,8 @@
 # Global settings: screen, colors, and values shared by several files.
 # Values that belong to ONE behavior live next to that behavior
 # (projectiles.py, hazards.py, boss1.py, boss2.py).
+from pathlib import Path
+
 
 # Config
 WIDTH, HEIGHT = 960, 540
@@ -8,11 +10,13 @@ FPS = 60
 DEBUG_KEYS = True  # 1/2/3 = jump to boss phase 1/2/3, G = toggle god mode
 TITLE = "Wandering in Whimsicave"
 BACKGROUND_COLOR = (25, 20, 35)
+SHOW_HITBOXES = True
+ASSET_DIR = Path(__file__).resolve().parent.parent / "assets"
 
 # Player Values
-PLAYER_RADIUS = 14
+PLAYER_RADIUS = 25
 PLAYER_SPEED = 320            # px/s
-PLAYER_SHOOT_COOLDOWN = 0.1
+PLAYER_SHOOT_COOLDOWN = 0.2
 PLAYER_BULLET_SPEED = 520
 PLAYER_BULLET_RADIUS = 5
 
