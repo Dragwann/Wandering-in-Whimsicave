@@ -6,6 +6,8 @@ from utilities.utils import load_image, white_silhouette, soften_background
 from projectiles.projectiles import (Bullet, RainShell, WaveBullet, RAIN_SPLIT_Y, RAIN_SHELL_SPEED,
                                      pine_cone)
 from projectiles.hazards import Wall
+from utilities.ui import draw_health_bar
+
 
 # Boss 1 visuals (paths are relative to the assets folder)
 BOSS_IMAGE = "entities/Boss1_asset.png"
@@ -166,3 +168,4 @@ class Boss:
         surf.blit(img, img.get_rect(center=(int(self.x), int(self.y))))
         if SHOW_HITBOXES:
             pygame.draw.circle(surf, WHITE, (int(self.x), int(self.y)), self.radius, 1)
+            draw_health_bar(surf, self.hp, self.max_hp, color)

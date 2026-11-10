@@ -2,14 +2,14 @@ import sys
 import math
 import pygame
 
-from utilities.settings import (WIDTH, HEIGHT, FPS, DEBUG_KEYS, WHITE, BACKGROUND_COLOR,
+from utilities.settings import (WIDTH, HEIGHT, FPS, DEBUG_KEYS, WHITE,
                       PLAYER_RADIUS, JOY_BTN_RESTART, CROSSHAIR_DISTANCE)
 from utilities.utils import circle_hit
 from utilities.controls import read_input
 from entities.player import Player
 from entities.boss1 import Boss
 from entities.boss2 import Boss2
-from utilities.ui import draw_crosshair
+from utilities.ui import draw_crosshair, LifeCounter
 from scenes.menu import BOSS_NAMES, draw_menu
 
 
@@ -28,6 +28,7 @@ def main():
 
     selected = 0
     player, boss, player_bullets, boss_bullets, state = new_game(selected)
+    life_counter = LifeCounter(player.max_lives)
     state = "menu"        # the game opens on the boss select screen
     god_mode = False
     aim_mode = "mouse"
@@ -100,6 +101,8 @@ def main():
         if state == "playing":
             player.update(dt, move_x, move_y, shooting, aim_dir, player_bullets)
             boss.update(dt, boss_bullets, player)
+            life_counter.update(dt, player.lives)
+
 
             for b in player_bullets:
                 b.update(dt)
@@ -121,16 +124,25 @@ def main():
                 else:
                     still_alive_bullets.append(b)
             player_bullets[:] = still_alive_bullets
+            hit = any(b.hits(player.x, player.y, player.radius) for b in boss_bullets)
+            if boss.deals_contact_damage() and circle_hit(player.x, player.y, player.radius, boss.x, boss.y, boss.radius):
+                hit = True
+            if hit and not god_mode:
+                player.take_hit()
+            if player.lives <= 0:
+                state = "lose"
 
-            # collisions : boss hazards + boss body vs player
+            # collisions : boss hazards + boss body vs player (make collision with boss again)
             if not god_mode:
                 for b in boss_bullets:
                     if b.hits(player.x, player.y, PLAYER_RADIUS):
-                        state = "lose"
+                        if player.lives <= 0:
+                            state = "lose"
                         break
                 if boss.deals_contact_damage() and circle_hit(
                         player.x, player.y, PLAYER_RADIUS, boss.x, boss.y, boss.radius):
-                    state = "lose"
+                    if player.lives <= 0:
+                            state = "lose"
 
             if boss.hp <= 0:
                 state = "win"
@@ -146,6 +158,7 @@ def main():
             for b in player_bullets:
                 b.draw(screen)
             player.draw(screen)
+            life_counter.draw(screen, player.lives)
 
             if aim_mode == "mouse":
                 draw_crosshair(screen, *pygame.mouse.get_pos())

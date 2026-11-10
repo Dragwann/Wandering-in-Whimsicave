@@ -230,3 +230,7 @@ class Boss2:
         surf.blit(img, img.get_rect(center=(int(self.x), int(self.y))))
         if SHOW_HITBOXES:
             pygame.draw.circle(surf, WHITE, (int(self.x), int(self.y)), self.radius, 1)
+            # pygame.draw.rect(surf, WHITE, (int(self.x), int(self.y)), self.radius, 1)
+            # w = self.image.get_width()
+            # h = self.image.get_height()
+            # pygame.draw.rect(surf, WHITE, (int(self.x - w//2), int(self.y - h//2), w, h), 1)  

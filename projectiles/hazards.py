@@ -20,8 +20,6 @@ WALL_WARNING_TIME = 0.8        # lane is outlined before the wall becomes danger
 MINE_ARM_TIME = 0.6            # harmless "warning" time after being dropped
 MINE_LIFETIME = 3.5            # dangerous time
 MINE_COUNT = 12                # bullets in the ring
-MINE_RING_RADIUS = 36
-MINE_DOT_RADIUS = 7
 MINE_CORE_RADIUS = 12
 
 

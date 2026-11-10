@@ -1,6 +1,6 @@
 from utilities.settings import WIDTH, TITLE, WHITE, YELLOW, BACKGROUND_COLOR
 
-BOSS_NAMES = ["Boss 1", "Boss 2"]
+BOSS_NAMES = ["James Pines", "Dr. Maurice"]
 
 
 def draw_menu(surf, title_font, menu_font, selected):
