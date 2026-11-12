@@ -1,24 +1,18 @@
-# Global settings: screen, colors, and values shared by several files.
+# Global settings: screen, colors, controller and debug switches.
 # Values that belong to ONE behavior live next to that behavior
-# (projectiles.py, hazards.py, boss1.py, boss2.py).
+# (player.py, projectiles.py, hazards.py, boss1.py, boss2.py).
 from pathlib import Path
 
 
 # Config
 WIDTH, HEIGHT = 960, 540
 FPS = 60
-DEBUG_KEYS = True  # 1/2/3 = jump to boss phase 1/2/3, G = toggle god mode
+DEBUG_KEYS = True  # 1/2/3 = jump to boss phase 1/2/3, G = toggle god mode, K = skip a Boss 3 stage
 TITLE = "Wandering in Whimsicave"
 BACKGROUND_COLOR = (25, 20, 35)
-SHOW_HITBOXES = True
+SHOW_HITBOXES = True           # debug: draws every enabled hitbox (the exact geometry used by collisions)
+SHOW_BOSS_HEALTH_BAR = True    # debug: boss health bar at the top (independent from SHOW_HITBOXES)
 ASSET_DIR = Path(__file__).resolve().parent.parent / "assets"
-
-# Player Values
-PLAYER_RADIUS = 25
-PLAYER_SPEED = 320            # px/s
-PLAYER_SHOOT_COOLDOWN = 0.2
-PLAYER_BULLET_SPEED = 520
-PLAYER_BULLET_RADIUS = 5
 
 # Controller (button numbers differ between pads, adjust if yours is off)
 JOY_DEADZONE = 0.2             # ignore stick values smaller than this

@@ -2,28 +2,29 @@ import sys
 import math
 import pygame
 
-from utilities.settings import (WIDTH, HEIGHT, FPS, DEBUG_KEYS, WHITE,
-                      PLAYER_RADIUS, JOY_BTN_RESTART, CROSSHAIR_DISTANCE)
-from utilities.utils import circle_hit
+from utilities.settings import (WIDTH, HEIGHT, FPS, DEBUG_KEYS, WHITE, SHOW_HITBOXES,
+                                SHOW_BOSS_HEALTH_BAR, JOY_BTN_RESTART, CROSSHAIR_DISTANCE)
+from utilities.collision import CollisionManager
 from utilities.controls import read_input
 from entities.player import Player
 from entities.boss1 import Boss
 from entities.boss2 import Boss2
-from utilities.ui import draw_crosshair, LifeCounter
-from scenes.menu import BOSS_NAMES, draw_menu
+from entities.boss3_encounter import Boss3Encounter
+from utilities.ui import draw_crosshair, draw_health_bar, LifeCounter
+from scenes.menu import BOSS_NAMES, Menu
 
 
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WIDTH, HEIGHT))
-    pygame.display.set_caption("Wandering in Whimsicave (prototype)")
+    pygame.display.set_caption("Wandering in Whimsicave")
     clock = pygame.time.Clock()
     font = pygame.font.SysFont("arial", 28)
-    title_font = pygame.font.SysFont("arial", 64)
-    menu_font = pygame.font.SysFont("arial", 36)
+    menu = Menu()
+    collisions = CollisionManager()
 
     def new_game(boss_index):
-        boss = Boss() if boss_index == 0 else Boss2()
+        boss = (Boss, Boss2, Boss3Encounter)[boss_index]()
         return Player(), boss, [], [], "playing"
 
     selected = 0
@@ -60,28 +61,29 @@ def main():
             if event.type == pygame.JOYBUTTONDOWN:
                 if event.button == JOY_BTN_RESTART and state in ("win", "lose"):
                     player, boss, player_bullets, boss_bullets, state = new_game(selected)
-            if event.type == pygame.KEYDOWN:
-                if state == "menu":
-                    if event.key == pygame.K_UP:
-                        selected = (selected - 1) % len(BOSS_NAMES)
-                    elif event.key == pygame.K_DOWN:
-                        selected = (selected + 1) % len(BOSS_NAMES)
-                    elif event.key == pygame.K_RETURN:
-                        player, boss, player_bullets, boss_bullets, state = new_game(selected)
-                    elif event.key == pygame.K_ESCAPE:
+            if state == "menu":
+                action = menu.handle_event(event)
+                if action:
+                    kind, value = action
+                    if kind == "quit":
                         pygame.quit()
                         sys.exit()
-                else:
-                    if event.key == pygame.K_ESCAPE:
-                        state = "menu"
-                    if event.key == pygame.K_r and state in ("win", "lose"):
-                        player, boss, player_bullets, boss_bullets, state = new_game(selected)
-                    if DEBUG_KEYS and state == "playing":
-                        if event.key in debug_phase_hp:
-                            boss.hp = boss.max_hp * debug_phase_hp[event.key]
-                        if event.key == pygame.K_g:
-                            god_mode = not god_mode
-                            print("God mode:", "ON" if god_mode else "OFF")
+                    selected = value
+                    player, boss, player_bullets, boss_bullets, state = new_game(selected)
+                continue
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    state = "menu"
+                if event.key == pygame.K_r and state in ("win", "lose"):
+                    player, boss, player_bullets, boss_bullets, state = new_game(selected)
+                if DEBUG_KEYS and state == "playing":
+                    if event.key in debug_phase_hp:
+                        boss.hp = boss.max_hp * debug_phase_hp[event.key]
+                    if event.key == pygame.K_g:
+                        god_mode = not god_mode
+                        print("God mode:", "ON" if god_mode else "OFF")
+                    if event.key == pygame.K_k and hasattr(boss, "debug_skip"):
+                        boss.debug_skip()   # Boss 3: kill the current stage
 
         keys = pygame.key.get_pressed()
         move_x, move_y, shooting, stick_aim = read_input(keys, joysticks)
@@ -103,7 +105,6 @@ def main():
             boss.update(dt, boss_bullets, player)
             life_counter.update(dt, player.lives)
 
-
             for b in player_bullets:
                 b.update(dt)
 
@@ -116,40 +117,31 @@ def main():
             player_bullets[:] = [b for b in player_bullets if not b.offscreen()]
             boss_bullets[:] = [b for b in boss_bullets if not (b.dead or b.offscreen())]
 
-            # collisions : Player vs. boss shots (absorbed, but no damage, during transitions)
-            still_alive_bullets = []
-            for b in player_bullets:
-                if circle_hit(b.x, b.y, b.radius, boss.x, boss.y, boss.radius):
-                    boss.take_hit(1)
-                else:
-                    still_alive_bullets.append(b)
-            player_bullets[:] = still_alive_bullets
-            hit = any(b.hits(player.x, player.y, player.radius) for b in boss_bullets)
-            if boss.deals_contact_damage() and circle_hit(player.x, player.y, player.radius, boss.x, boss.y, boss.radius):
-                hit = True
-            if hit and not god_mode:
+            # 1) DETECT: the CollisionManager only says who touches whom...
+            hits = collisions.detect(player, boss, player_bullets, boss_bullets)
+
+            # 2) ...and the gameplay rules decide the consequences.
+            # Player bullets that touch the boss are absorbed; they only hurt while it is vulnerable
+            # (boss.take_hit ignores the damage during a phase transition).
+            absorbed = {id(b) for b in hits.boss_hit_by}
+            for _ in hits.boss_hit_by:
+                boss.take_hit(1)
+            player_bullets[:] = [b for b in player_bullets if id(b) not in absorbed]
+
+            # The player is hurt by any hazard, or by the boss body if that boss hurts on contact.
+            player_hurt = bool(hits.hazards_hitting_player) or (
+                hits.player_touches_boss and boss.deals_contact_damage())
+            if player_hurt and not god_mode:
                 player.take_hit()
             if player.lives <= 0:
                 state = "lose"
-
-            # collisions : boss hazards + boss body vs player (make collision with boss again)
-            if not god_mode:
-                for b in boss_bullets:
-                    if b.hits(player.x, player.y, PLAYER_RADIUS):
-                        if player.lives <= 0:
-                            state = "lose"
-                        break
-                if boss.deals_contact_damage() and circle_hit(
-                        player.x, player.y, PLAYER_RADIUS, boss.x, boss.y, boss.radius):
-                    if player.lives <= 0:
-                            state = "lose"
 
             if boss.hp <= 0:
                 state = "win"
 
         # Drawing
         if state == "menu":
-            draw_menu(screen, title_font, menu_font, selected)
+            menu.draw(screen)
         else:
             boss.draw_background(screen)
             boss.draw(screen)
@@ -159,6 +151,12 @@ def main():
                 b.draw(screen)
             player.draw(screen)
             life_counter.draw(screen, player.lives)
+
+            if SHOW_BOSS_HEALTH_BAR:
+                draw_health_bar(screen, boss.hp, boss.max_hp, boss.phase_color(),
+                                getattr(boss, "health_ticks", (1 / 3, 2 / 3)))
+            if SHOW_HITBOXES:
+                collisions.draw_debug(screen, [player, boss], player_bullets, boss_bullets)
 
             if aim_mode == "mouse":
                 draw_crosshair(screen, *pygame.mouse.get_pos())

@@ -1,14 +1,9 @@
-import math
 import sys
 import pygame
 
 from utilities.settings import ASSET_DIR, WHITE
 
 _image_cache = {}   # an image file is read from disk only once, however many times it is requested
-
-
-def circle_hit(x1, y1, r1, x2, y2, r2):
-    return math.hypot(x1 - x2, y1 - y2) < (r1 + r2)
 
 
 def load_image(filename, size=None, height=None, alpha=True):

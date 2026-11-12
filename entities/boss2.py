@@ -2,20 +2,22 @@ import math
 import random
 import pygame
 
-from utilities.settings import WIDTH, HEIGHT, WHITE, WARNING, RED, YELLOW, TEAL, SHOW_HITBOXES
+from utilities.settings import WIDTH, HEIGHT, WHITE, WARNING, RED, YELLOW, TEAL
 from projectiles.projectiles import TrailBullet, TRAIL_INTERVAL
 from projectiles.hazards import Mine
 from utilities.utils import load_image, white_silhouette, soften_background
+from utilities.hitbox import Hitbox
 
 BOSS_IMAGE = "entities/Boss2_asset.png"
-BOSS_DRAW_HEIGHT = 330
+BOSS_DRAW_HEIGHT = 290
 BACKGROUND_IMAGE = "backgrounds/Boss2_background.jpg"
 BACKGROUND_DIM = 0.45
 BACKGROUND_TINT = (15, 10, 30)
 BACKGROUND_BLUR = 3
 
 # Boss 2 Values
-BOSS2_RADIUS = 40
+BOSS2_HITBOX_SCALE = 1.0       # hitbox (rectangle) = sprite size x this. 1.0 = the whole sprite, 0.8 = a bit smaller
+BOSS2_TELEGRAPH_TARGET_RADIUS = 40   # visual only: ring drawn where the dash will end
 BOSS2_MAX_HP = 300
 BOSS2_BASE_X = WIDTH - 130
 BOSS2_FIRST_ATTACK_DELAY = 1.0 # pause before the first action of a phase
@@ -45,9 +47,8 @@ class Boss2:
         reposition -> telegraph -> dash -> recover -> reposition -> ...
     """
 
-    def __init__(self):
+    def __init__(self, hitbox_scale=BOSS2_HITBOX_SCALE):
         self.x, self.y = BOSS2_BASE_X, HEIGHT // 2
-        self.radius = BOSS2_RADIUS
         self.max_hp = BOSS2_MAX_HP
         self.hp = self.max_hp
         self.phase = 1
@@ -62,6 +63,13 @@ class Boss2:
         self.background = soften_background(
             load_image(BACKGROUND_IMAGE, size=(WIDTH, HEIGHT), alpha=False),
             BACKGROUND_DIM, BACKGROUND_TINT, BACKGROUND_BLUR)
+        # The hitbox is the ONLY place where the boss's collision size lives.
+        # Its size is computed ONCE here (the sprite width depends on the image ratio) and is
+        # never read from the sprite again. It is swept (path since last frame tested) only
+        # while dashing: see update().
+        self.body_hitbox = Hitbox.rect(self, self.image.get_width() * hitbox_scale,
+                                       self.image.get_height() * hitbox_scale)
+        self.hitboxes = [self.body_hitbox]
 
     # ---- HP / phases ----
     def get_phase(self):
@@ -71,6 +79,16 @@ class Boss2:
         if ratio > 1 / 3:
             return 2
         return 3
+
+    def phase_color(self):
+        """Color of the current phase (debug health bar). It blinks white with the sprite."""
+        return WHITE if self.flashing() else BOSS2_PHASES[self.phase]["color"]
+
+    def flashing(self):
+        """True while the sprite is in the white half of a blink (phase change or dash warning)."""
+        if self.invulnerable() and int(self.transition_timer * 10) % 2 == 0:
+            return True
+        return self.state == "telegraph" and int(self.state_timer * 20) % 2 == 0
 
     def invulnerable(self):
         return self.transition_timer > 0
@@ -87,6 +105,7 @@ class Boss2:
         self.transition_timer = BOSS2_TRANSITION_TIME
         bullets.clear()   # clean slate (trail + mines) so the player can breathe
         self.reset_behavior()
+        self.body_hitbox.swept = False   # frozen during the transition: nothing to sweep
 
     def reset_behavior(self):
         """Called at spawn and at every phase change."""
@@ -169,10 +188,15 @@ class Boss2:
                 bullets.append(Mine(self.x, self.y))
                 self.mine_timer = cfg["mine_interval"]
 
+        # Sweep the hitbox on every frame in which the boss MOVES in "dash" state. The flag is read
+        # BEFORE update_dash, because the last frame of a dash switches the state to "recover"
+        # in the same call that moved the boss.
+        dashing_this_frame = cfg["dash"] and self.state == "dash"
         if cfg["dash"]:
             self.update_dash(dt, bullets, player, mult)
         else:
             self.update_wander(dt, mult)
+        self.body_hitbox.swept = dashing_this_frame
 
     def update_wander(self, dt, mult):
         if self.move_toward(self.target, BOSS2_MOVE_SPEED * mult, dt):
@@ -210,27 +234,16 @@ class Boss2:
         surf.blit(self.background, (0, 0))
 
     def draw(self, surf):
-        color = BOSS2_PHASES[self.phase]["color"]
-        flash = self.invulnerable() and int(self.transition_timer * 10) % 2 == 0
         if self.state == "telegraph":
             # the line shows exactly where the dash will go
             pygame.draw.line(surf, WARNING, (int(self.x), int(self.y)),
                              (int(self.dash_target[0]), int(self.dash_target[1])), 3)
             pygame.draw.circle(surf, WARNING, (int(self.dash_target[0]), int(self.dash_target[1])),
-                               self.radius, 2)
-            if int(self.state_timer * 20) % 2 == 0:
-                flash = True
-        if flash:
-            color = WHITE   # the health bar blinks too, like before
+                               BOSS2_TELEGRAPH_TARGET_RADIUS, 2)
+        flash = self.flashing()
 
         if self.facing_right:
             img = self.flash_flipped if flash else self.image_flipped
         else:
             img = self.flash_image if flash else self.image
         surf.blit(img, img.get_rect(center=(int(self.x), int(self.y))))
-        if SHOW_HITBOXES:
-            pygame.draw.circle(surf, WHITE, (int(self.x), int(self.y)), self.radius, 1)
-            # pygame.draw.rect(surf, WHITE, (int(self.x), int(self.y)), self.radius, 1)
-            # w = self.image.get_width()
-            # h = self.image.get_height()
-            # pygame.draw.rect(surf, WHITE, (int(self.x - w//2), int(self.y - h//2), w, h), 1)  

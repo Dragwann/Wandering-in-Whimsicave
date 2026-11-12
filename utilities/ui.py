@@ -11,13 +11,13 @@ LIFE_ICON_SPACING = 5          # space between two icons
 LIFE_ICON_BLINK_TIME = 1.0 
 
 
-def draw_health_bar(surf, hp, max_hp, color):
-    """Minimal health bar (no UI), with a tick at each phase change."""
+def draw_health_bar(surf, hp, max_hp, color, ticks=(1 / 3, 2 / 3)):
+    """Minimal health bar (no UI), with a tick at each phase change (ticks = HP fractions, () for none)."""
     ratio = max(hp, 0) / max_hp
     bar_x = WIDTH // 2 - 150
     pygame.draw.rect(surf, BLACK, (bar_x - 2, 20, 304, 18))
     pygame.draw.rect(surf, color, (bar_x, 22, int(300 * ratio), 14))
-    for tick in (1 / 3, 2 / 3):
+    for tick in ticks:
         tx = bar_x + int(300 * tick)
         pygame.draw.line(surf, WHITE, (tx, 20), (tx, 38), 2)
 

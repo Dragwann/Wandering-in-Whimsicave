@@ -1,12 +1,11 @@
 import math
-import pygame
 
-from utilities.settings import WIDTH, HEIGHT, WHITE, RED, ORANGE, CRIMSON, PURPLE, SHOW_HITBOXES
+from utilities.settings import WIDTH, HEIGHT, RED, ORANGE, CRIMSON, PURPLE
 from utilities.utils import load_image, white_silhouette, soften_background
+from utilities.hitbox import Hitbox
 from projectiles.projectiles import (Bullet, RainShell, WaveBullet, RAIN_SPLIT_Y, RAIN_SHELL_SPEED,
                                      pine_cone)
 from projectiles.hazards import Wall
-from utilities.ui import draw_health_bar
 
 
 # Boss 1 visuals (paths are relative to the assets folder)
@@ -18,7 +17,7 @@ BACKGROUND_TINT = (15, 10, 30) # color of the veil laid over the background
 BACKGROUND_BLUR = 3            # 1 = no blur, 2-4 = softer details
 
 # Boss 1 Values
-BOSS_RADIUS = 70               # hitbox (circle), visible with SHOW_HITBOXES
+BOSS_HITBOX_RADIUS = 70        # default hitbox (circle). Independent from the sprite size above.
 BOSS_MAX_HP = 300
 BOSS_BASE_X = WIDTH - 130
 BOSS_MOVE_RANGE = 170          # vertical amplitude (px)
@@ -57,9 +56,8 @@ PHASES = {
 
 
 class Boss:
-    def __init__(self):
+    def __init__(self, hitbox_radius=BOSS_HITBOX_RADIUS):
         self.x, self.y = BOSS_BASE_X, HEIGHT // 2
-        self.radius = BOSS_RADIUS
         self.max_hp = BOSS_MAX_HP
         self.hp = self.max_hp
         self.phase = 1
@@ -68,6 +66,9 @@ class Boss:
         self.attack_index = 0                 # position in the current phase sequence
         self.attack_timer = FIRST_ATTACK_DELAY
         self.wall_index = 0                   # walls go top -> middle -> bottom -> ...
+        # The hitbox is the ONLY place where the boss's collision size lives.
+        # Phase-dependent or extra hitboxes (weak points...) would be added to this list.
+        self.hitboxes = [Hitbox.circle(self, hitbox_radius)]
         # attack name (used in PHASES) -> method
         self.attacks = {
             "direct": self.attack_direct,
@@ -92,11 +93,15 @@ class Boss:
             return 2
         return 3
 
+    def phase_color(self):
+        """Color of the current phase (used by the debug health bar)."""
+        return PHASES[self.phase]["color"]
+
     def invulnerable(self):
         return self.transition_timer > 0
 
     def deals_contact_damage(self):
-        return False   # Boss 1 is harmless to touch
+        return True
 
     def take_hit(self, damage=1):
         if not self.invulnerable():
@@ -161,11 +166,7 @@ class Boss:
         surf.blit(self.background, (0, 0))
 
     def draw(self, surf):
-        color = PHASES[self.phase]["color"]
         # Flash white during the transition so the player understands something changed
         flash = self.invulnerable() and int(self.transition_timer * 10) % 2 == 0
         img = self.flash_image if flash else self.image
         surf.blit(img, img.get_rect(center=(int(self.x), int(self.y))))
-        if SHOW_HITBOXES:
-            pygame.draw.circle(surf, WHITE, (int(self.x), int(self.y)), self.radius, 1)
-            draw_health_bar(surf, self.hp, self.max_hp, color)
